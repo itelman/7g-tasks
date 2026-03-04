@@ -14,6 +14,19 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
+/*
+Objective:
+
+Observes traffic involving a given machine/IP (example: 192.168.10.100), packets that come from/to
+the machine, and delivers basic info to the analyzer
+
+Steps:
+
+1. Capture and read packets, parse layers.
+2. Extracts: 5-tuple, packet length
+3. Sends JSON metadata via UDP to analyzer.
+*/
+
 func RunSniffer() {
 	if len(os.Args) < 4 {
 		log.Fatal("Usage: ./sniffer <interface> <filter_ip> <analyzer_host:port>")

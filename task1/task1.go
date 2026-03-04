@@ -14,20 +14,20 @@ import (
 )
 
 /*
-Network traffic analytics
+
+Objective:
+
+Analyze how a machine (example: 192.168.10.100) repeatedly sends/receives packets
+(generates traffic) to/from one or several IPs
 
 Steps:
+
 1. Read packets from given interface (example: enp3s0)
 2. Apply a kernel-level BPF filter for a given host IP: only accept packets involving that IP
 (example: 192.168.0.24)
 3. Maintain sliding window of last N packets (example: 100), keep a frequency distribution of
 source IPs in that window
 4. Compute Shannon entropy over that window every T seconds to measure traffic diversity (example: 3)
-
-This is used in:
-- DDoS detection
-- Port scan detection
-- Traffic anomaly detection
 */
 
 /*
@@ -38,6 +38,35 @@ Interview Talking Points, Advanced Upgrade:
 - - Packet sizes
 - - 5-tuples
 */
+
+// Time complexity - O(K)
+// K - number of unique IPs
+// Worst case: O(windowSize) - if K equals window size
+
+// Higher entropy - more diverse traffic
+// Lower entropy - more uniform traffic
+
+// When LOW/NO traffic diversity -> entropy is 0 because all packets come from same IP
+// When HIGHER traffic diversity -> entropy increases because packets come from many equally frequent IPs
+func calculateEntropy(counts map[string]int, total int) float64 {
+	if total == 0 {
+		return 0
+	}
+
+	var entropy float64
+
+	// Computation of Shannon entropy over packet source IP distribution:
+
+	// 'count' = number of packets from one IP; count of value x in window
+	// 'total' = window size
+	// 'p' = probability of that IP
+	for _, count := range counts {
+		p := float64(count) / float64(total)
+		entropy -= p * math.Log2(p)
+	}
+
+	return entropy
+}
 
 func Run() {
 	if len(os.Args) < 5 {
@@ -124,30 +153,4 @@ func Run() {
 		// At any moment 'counts' map contains exact frequency distribution of current sliding window
 		// This makes entropy calculation correct and efficient
 	}
-}
-
-// Time complexity - O(K)
-// K - number of unique IPs
-// Worst case: O(windowSize) - if K equals window size
-
-// Higher entropy - more diverse traffic
-// Lower entropy - more uniform traffic
-func calculateEntropy(counts map[string]int, total int) float64 {
-	if total == 0 {
-		return 0
-	}
-
-	var entropy float64
-
-	// Computation of Shannon entropy over packet source IP distribution:
-
-	// 'count' = number of packets from one IP; count of value x in window
-	// 'total' = window size
-	// 'p' = probability of that IP
-	for _, count := range counts {
-		p := float64(count) / float64(total)
-		entropy -= p * math.Log2(p)
-	}
-
-	return entropy
 }

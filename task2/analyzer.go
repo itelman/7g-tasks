@@ -6,12 +6,75 @@ import (
 	"log"
 	"net"
 	"os"
+	"sort"
 	"time"
 )
 
+/*
+Objective:
+
+Receives info from the sniffer, and keeps stats: how many packets and total bytes per IP
+Every 5 seconds, prints: which IP had the most packets, and which transferred the most data
+
+Steps:
+
+1. Receives JSON metadata from sniffer.
+2. Updates stats map.
+3. Every 5 seconds → prints top IPs.
+*/
+
 type Stats struct {
+	IP      string
 	Packets int
 	Bytes   int
+}
+
+// Each packet updates stats
+// Time complexity: O(1)
+func update(stats map[string]*Stats, ip string, length int) {
+	if _, ok := stats[ip]; !ok {
+		stats[ip] = &Stats{IP: ip}
+	}
+	stats[ip].Packets++
+	stats[ip].Bytes += length
+}
+
+func printStats(stats map[string]*Stats) {
+	hosts := make([]Stats, 0, len(stats))
+
+	for _, v := range stats {
+		hosts = append(hosts, *v)
+	}
+
+	fmt.Printf("Unique IPs observed: %d\n\n", len(hosts))
+
+	// Sort by packets
+	sort.Slice(hosts, func(i, j int) bool {
+		return hosts[i].Packets > hosts[j].Packets
+	})
+
+	fmt.Println("Top 5 by packets:")
+	for i := 0; i < 5 && i < len(hosts); i++ {
+		fmt.Printf("%d. %s (%d packets)\n",
+			i+1,
+			hosts[i].IP,
+			hosts[i].Packets,
+		)
+	}
+
+	// Sort by bytes
+	sort.Slice(hosts, func(i, j int) bool {
+		return hosts[i].Bytes > hosts[j].Bytes
+	})
+
+	fmt.Println("\nTop 5 by bytes:")
+	for i := 0; i < 5 && i < len(hosts); i++ {
+		fmt.Printf("%d. %s (%d bytes)\n",
+			i+1,
+			hosts[i].IP,
+			hosts[i].Bytes,
+		)
+	}
 }
 
 func RunAnalyzer() {
@@ -57,7 +120,9 @@ func RunAnalyzer() {
 
 			log.Println("===== Statistics =====")
 			fmt.Printf("Top by packets: %s (%d packets)\n", maxPacketsIP, maxPackets)
-			fmt.Printf("Top by bytes: %s (%d bytes)\n", maxBytesIP, maxBytes)
+			fmt.Printf("Top by bytes: %s (%d bytes)\n\n", maxBytesIP, maxBytes)
+
+			// printStats(stats)
 		}
 	}()
 
@@ -75,14 +140,4 @@ func RunAnalyzer() {
 		update(stats, info.SrcIP, info.Length)
 		update(stats, info.DstIP, info.Length)
 	}
-}
-
-// Each packet updates stats
-// Time complexity: O(1)
-func update(stats map[string]*Stats, ip string, length int) {
-	if _, ok := stats[ip]; !ok {
-		stats[ip] = &Stats{}
-	}
-	stats[ip].Packets++
-	stats[ip].Bytes += length
 }
