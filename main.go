@@ -1,6 +1,6 @@
 package main
 
-import "kazdream/task2"
+import "github.com/itelman/7g-tasks/task2"
 
 func main() {
 	// task1.Run()
