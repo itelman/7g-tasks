@@ -22,14 +22,14 @@ the machine, and delivers basic info to the analyzer
 
 Steps:
 
-1. Capture and read packets, parse layers.
+1. Capture and read packets involving a given interface and IP, parse layers.
 2. Extracts: 5-tuple, packet length
 3. Sends JSON metadata via UDP to analyzer.
 */
 
 func RunSniffer() {
 	if len(os.Args) < 4 {
-		log.Fatal("Usage: ./sniffer <interface> <filter_ip> <analyzer_host:port>")
+		log.Fatalln("Usage: ./sniffer <interface> <filter_ip> <analyzer_host:port>")
 	}
 
 	interf := os.Args[1]
@@ -39,13 +39,13 @@ func RunSniffer() {
 	// Capture all packets seen by the given interface
 	handle, err := pcap.OpenLive(interf, 1600, true, pcap.BlockForever)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 	defer handle.Close()
 
-	err = handle.SetBPFFilter("host " + filterIP)
-	if err != nil {
-		log.Fatal(err)
+	// Filter packets by given IP
+	if err := handle.SetBPFFilter("host " + filterIP); err != nil {
+		log.Fatalln(err)
 	}
 
 	// Creates a continuous stream of captured packets
@@ -53,7 +53,7 @@ func RunSniffer() {
 
 	conn, err := net.Dial("udp", analyzerAddr)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 	defer conn.Close()
 
@@ -79,7 +79,7 @@ func RunSniffer() {
 		ip := ipLayer.(*layers.IPv4)
 
 		// Extract 5-Tuple (SrcIP, DstIP, SrcPort, DstPort, Protocol)
-		info := PacketInfo{
+		info := FiveTuple{
 			SrcIP:  ip.SrcIP.String(),
 			DstIP:  ip.DstIP.String(),
 			Length: len(packet.Data()),
@@ -89,12 +89,12 @@ func RunSniffer() {
 			tcp := tcpLayer.(*layers.TCP)
 			info.SrcPort = uint16(tcp.SrcPort)
 			info.DstPort = uint16(tcp.DstPort)
-			info.Proto = "TCP"
+			info.Protocol = "TCP"
 		} else if udpLayer := packet.Layer(layers.LayerTypeUDP); udpLayer != nil {
 			udp := udpLayer.(*layers.UDP)
 			info.SrcPort = uint16(udp.SrcPort)
 			info.DstPort = uint16(udp.DstPort)
-			info.Proto = "UDP"
+			info.Protocol = "UDP"
 		}
 
 		// Send metadata to analyzer via UDP

@@ -14,7 +14,6 @@ import (
 )
 
 /*
-
 Objective:
 
 Analyze how a machine (example: 192.168.10.100) repeatedly sends/receives packets
@@ -25,18 +24,9 @@ Steps:
 1. Read packets from given interface (example: enp3s0)
 2. Apply a kernel-level BPF filter for a given host IP: only accept packets involving that IP
 (example: 192.168.0.24)
-3. Maintain sliding window of last N packets (example: 100), keep a frequency distribution of
+3. Maintain sliding window of last N packets (example: 1000), keep a frequency distribution of
 source IPs in that window
 4. Compute Shannon entropy over that window every T seconds to measure traffic diversity (example: 3)
-*/
-
-/*
-Interview Talking Points, Advanced Upgrade:
-
-- Instead of IP entropy, compute entropy over:
-- - Destination ports
-- - Packet sizes
-- - 5-tuples
 */
 
 // Time complexity - O(K)
@@ -70,18 +60,25 @@ func calculateEntropy(counts map[string]int, total int) float64 {
 
 func Run() {
 	if len(os.Args) < 5 {
-		log.Fatal("Usage: ./entropy <interface> <filterIP> <windowSize> <periodSeconds>")
+		log.Fatalln("Usage: ./task1 <interface> <filterIP> <windowSize> <periodSeconds>")
 	}
 
 	iface := os.Args[1]
 	filterIP := os.Args[2]
-	windowSize, _ := strconv.Atoi(os.Args[3])
-	periodSec, _ := strconv.Atoi(os.Args[4])
+	windowSize, err := strconv.Atoi(os.Args[3])
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	periodSec, err := strconv.Atoi(os.Args[4])
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	// Open interface
 	handle, err := pcap.OpenLive(iface, 1600, true, pcap.BlockForever)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 	defer handle.Close()
 
@@ -91,16 +88,15 @@ func Run() {
 	// - Reduces CPU usage
 	// - Avoids unnecessary memory copies
 	// - Improves performance
-	err = handle.SetBPFFilter("host " + filterIP)
-	if err != nil {
-		log.Fatal(err)
+	if err := handle.SetBPFFilter("host " + filterIP); err != nil {
+		log.Fatalln(err)
 	}
 
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 
 	// Sliding window mechanism
 
-	// 'window' stores the last N source IPs (FIFO queue)
+	// 'window' stores the last N packets (FIFO queue)
 	window := make([]string, 0, windowSize)
 	// 'counts' stores how many times each IP appears in the window
 	counts := make(map[string]int)

@@ -3,8 +3,10 @@ package task3
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"sort"
+	"strconv"
 )
 
 // Word entity for working with words, because by task requirement, strings are NOT allowed
@@ -90,15 +92,20 @@ func addWord(words *[]Word, w []byte) {
 }
 
 func Run() {
-	if len(os.Args) < 2 {
-		return
+	if len(os.Args) < 3 {
+		log.Fatalln("Usage: ./task3 <file> <limit>")
 	}
 
 	file, err := os.Open(os.Args[1])
 	if err != nil {
-		return
+		log.Fatalln(err)
 	}
 	defer file.Close()
+
+	limit, err := strconv.Atoi(os.Args[2])
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	// var words []Word
 	hashTable := NewHashTable(100003)
@@ -147,6 +154,8 @@ func Run() {
 		hashTable.Insert(currentWord)
 	}
 
+	// The code adds all the words stored in the HT into a slice 'words'
+	// so that it would be easier to do the sorting and printing results
 	var words []Word
 
 	for i := 0; i < hashTable.size; i++ {
@@ -170,8 +179,7 @@ func Run() {
 		return words[i].count > words[j].count
 	})
 
-	limit := 20
-	if len(words) < 20 {
+	if len(words) < limit {
 		limit = len(words)
 	}
 

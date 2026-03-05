@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"sort"
+	"strconv"
 	"time"
 )
 
@@ -78,16 +79,28 @@ func printStats(stats map[string]*Stats) {
 }
 
 func RunAnalyzer() {
-	if len(os.Args) < 2 {
-		log.Fatal("Usage: ./analyzer <listen_host:port>")
+	if len(os.Args) < 3 {
+		log.Fatalln("Usage: ./analyzer <listen_host:port> <periodSeconds>")
 	}
 
 	listenAddr := os.Args[1]
+	periodSec, err := strconv.Atoi(os.Args[2])
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	stats := make(map[string]*Stats)
 
 	// Listen on UDP
-	addr, _ := net.ResolveUDPAddr("udp", listenAddr)
-	conn, _ := net.ListenUDP("udp", addr)
+	addr, err := net.ResolveUDPAddr("udp", listenAddr)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	conn, err := net.ListenUDP("udp", addr)
+	if err != nil {
+		log.Fatalln(err)
+	}
 	defer conn.Close()
 
 	// Every 5 seconds:
@@ -100,20 +113,21 @@ func RunAnalyzer() {
 	// N = number of unique IPs.
 	go func() {
 		for {
-			time.Sleep(5 * time.Second)
+			time.Sleep(time.Duration(periodSec) * time.Second)
 
 			var maxPacketsIP string
 			var maxBytesIP string
 			maxPackets := 0
 			maxBytes := 0
 
-			for ip, s := range stats {
-				if s.Packets > maxPackets {
-					maxPackets = s.Packets
+			// Determine the IPs with the largest number of packets and the largest number of bytes
+			for ip, stat := range stats {
+				if stat.Packets > maxPackets {
+					maxPackets = stat.Packets
 					maxPacketsIP = ip
 				}
-				if s.Bytes > maxBytes {
-					maxBytes = s.Bytes
+				if stat.Bytes > maxBytes {
+					maxBytes = stat.Bytes
 					maxBytesIP = ip
 				}
 			}
@@ -126,14 +140,17 @@ func RunAnalyzer() {
 		}
 	}()
 
-	buffer := make([]byte, 2048)
+	buffer := make([]byte, 4096)
 
 	// For every received packet:
 	for {
 		// - Extract metadata
-		n, _, _ := conn.ReadFromUDP(buffer)
+		n, _, err := conn.ReadFromUDP(buffer)
+		if err != nil {
+			fmt.Println("[ERROR] Packet read error: ", err)
+		}
 
-		var info PacketInfo
+		var info FiveTuple
 		// - Update statistics
 		json.Unmarshal(buffer[:n], &info)
 
